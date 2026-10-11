@@ -1,0 +1,583 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Peak Strategy Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Layout: boardroom console. Sticky option tabs; each option = slider rail (left) + results column (right); Compare = full-width matrix */
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF1F6; --line:#D6DDE6; --ink:#0B1F3A; --fg:#1E293B; --muted:#5B6B80;
+  --gold:#B8901C; --gold-soft:#F6EBC8;
+  --optA:#2563A8; --optB:#B5562B; --optC:#0E7C7B;
+  --good:#17803D; --warn:#B7791F; --bad:#B42318;
+  --hero:#0B1F3A; --hero-fg:#F4F6F9; --hero-muted:#A9B7CA;
+  --f-display:'Bodoni Moda', 'Didot', Georgia, serif;
+  --f-body:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-data:'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#09111F; --surface:#101B2E; --surface-2:#16233A; --line:#24344F; --ink:#EAF0F8; --fg:#D3DCE8; --muted:#8C9CB3;
+  --gold:#D9B04A; --gold-soft:#3A3115; --optA:#5C9BE6; --optB:#E0814F; --optC:#33B3AE;
+  --good:#4CC27A; --warn:#E3A94A; --bad:#F06B5E; --hero:#060C18; --hero-fg:#EAF0F8; --hero-muted:#8C9CB3; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#09111F; --surface:#101B2E; --surface-2:#16233A; --line:#24344F; --ink:#EAF0F8; --fg:#D3DCE8; --muted:#8C9CB3;
+  --gold:#D9B04A; --gold-soft:#3A3115; --optA:#5C9BE6; --optB:#E0814F; --optC:#33B3AE;
+  --good:#4CC27A; --warn:#E3A94A; --bad:#F06B5E; --hero:#060C18; --hero-fg:#EAF0F8; --hero-muted:#8C9CB3; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:14px; line-height:1.5; margin:0}
+.wrap{max-width:1260px; margin:0 auto; padding-inline:clamp(16px,3vw,32px)}
+h1,h2,h3{font-family:var(--f-display); color:var(--ink); text-wrap:balance; margin:0; font-weight:700}
+.num,.mono{font-family:var(--f-data); font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; color:var(--gold)}
+
+/* hero */
+header.hero{background:var(--hero); color:var(--hero-fg); padding-block:28px 0; border-bottom:3px solid var(--gold)}
+.hero-top{display:flex; flex-wrap:wrap; gap:16px 32px; align-items:flex-end; justify-content:space-between}
+.hero h1{color:var(--hero-fg); font-size:clamp(30px,4.4vw,48px); line-height:1.05; letter-spacing:-.01em}
+.hero h1 em{font-style:italic; font-weight:500; color:var(--gold)}
+.hero .sub{color:var(--hero-muted); font-size:14px; margin-top:6px}
+.who{text-align:right; font-size:12px; color:var(--hero-muted)} .who b{display:block; color:var(--hero-fg); font-size:14px; font-weight:600}
+.gloss{margin-top:14px; color:var(--hero-muted); font-size:12.5px}
+.gloss summary{cursor:pointer; color:var(--hero-fg); font-weight:600; font-size:12.5px; width:max-content; max-width:100%}
+.gloss dl{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:6px 24px; margin:10px 0 4px}
+.gloss dt{color:var(--gold); font-weight:600; display:inline} .gloss dd{display:inline; margin:0}
+.gloss div{line-height:1.4}
+.globals{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px 28px; margin-top:18px; padding-block:16px; border-top:1px solid rgba(255,255,255,.12)}
+.globals .ctl label{color:var(--hero-muted)} .globals .ctl output{color:var(--hero-fg)}
+.globals .ctl .hint{color:var(--hero-muted)}
+.peakev{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
+.peakev .big{font-family:var(--f-display); font-size:26px; color:var(--hero-fg)}
+.peakev small{color:var(--hero-muted)}
+
+/* tabs */
+nav.tabs{position:sticky; top:env(safe-area-inset-top,0px); z-index:20; background:var(--bg); border-bottom:1px solid var(--line)}
+.tabrow{display:flex; gap:4px; overflow-x:auto; padding-block:10px; scrollbar-width:none}
+.tab{flex:0 0 auto; display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--surface); color:var(--fg);
+  padding:9px 16px; border-radius:999px; font:600 13px var(--f-body); cursor:pointer; transition:background .15s,border-color .15s}
+.tab .dot{width:10px; height:10px; border-radius:50%; background:var(--c,var(--gold))}
+.tab .tnpv{font-family:var(--f-data); font-weight:500; font-size:12px; color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)} .tab[aria-selected="true"] .tnpv{color:var(--bg); opacity:.75}
+.tab:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+
+/* option layout */
+main{padding-block:24px 56px}
+.panel-head{display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px 24px; align-items:flex-end; margin-bottom:18px}
+.panel-head h2{font-size:clamp(24px,3vw,34px)}
+.panel-head p{margin:4px 0 0; color:var(--muted); max-width:62ch}
+.presets{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.presets .lbl{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-right:4px}
+.chip{border:1px solid var(--line); background:var(--surface); color:var(--fg); padding:6px 12px; border-radius:6px; font:500 12px var(--f-body); cursor:pointer}
+.chip:hover{border-color:var(--c,var(--gold))}
+.chip.on{background:var(--c,var(--gold)); border-color:var(--c,var(--gold)); color:#fff}
+.layout{display:grid; grid-template-columns:300px minmax(0,1fr); gap:20px; align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.rail{background:var(--surface); border:1px solid var(--line); border-top:4px solid var(--c); border-radius:var(--radius); padding:16px; display:grid; gap:14px; position:sticky; top:72px}
+@media (max-width:900px){.rail{position:static}}
+.rail h3{font:600 11px var(--f-body); letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+.grp{display:grid; gap:12px; padding-top:12px; border-top:1px dashed var(--line)}
+.grp:first-of-type{border-top:0; padding-top:0}
+.ctl{display:grid; gap:4px}
+.ctl .row{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
+.ctl label{font-size:12.5px; color:var(--fg)}
+.ctl output{font-family:var(--f-data); font-size:12.5px; font-weight:500; color:var(--ink)}
+.ctl .hint{font-size:11px; color:var(--muted); line-height:1.35}
+input[type=range]{width:100%; accent-color:var(--c,var(--gold)); height:20px; margin:0}
+.toggle{display:flex; gap:8px; align-items:flex-start; font-size:12.5px; cursor:pointer}
+.toggle input{accent-color:var(--c,var(--gold)); margin-top:3px}
+.seg{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden}
+.seg button{flex:1; background:var(--surface); color:var(--fg); border:0; padding:6px 4px; font:500 11.5px var(--f-body); cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--c,var(--gold)); color:#fff}
+.reset{justify-self:start; background:none; border:0; color:var(--muted); font:500 12px var(--f-body); text-decoration:underline; cursor:pointer; padding:0}
+
+.col{display:grid; gap:18px; min-width:0}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+.kpi{background:var(--surface); padding:14px 16px; display:grid; gap:2px; align-content:start}
+.kpi .k{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600}
+.kpi .v{font-family:var(--f-display); font-size:28px; line-height:1.1; color:var(--ink)}
+.kpi .v.lead{color:var(--c)}
+.kpi .d{font-size:11.5px; color:var(--muted)}
+.delta.up{color:var(--good)} .delta.down{color:var(--bad)}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; min-width:0}
+.card h3{font-size:18px; margin-bottom:2px}
+.card .cap{font-size:12px; color:var(--muted); margin:0 0 10px}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px}
+@media (max-width:420px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.chartbox{position:relative; height:260px} .chartbox.tall{height:320px}
+.tbl-wrap{overflow-x:auto}
+table.cf{width:100%; border-collapse:collapse; font-size:12.5px; min-width:480px}
+table.cf th,table.cf td{padding:6px 8px; text-align:right; border-bottom:1px solid var(--line); font-family:var(--f-data); font-variant-numeric:tabular-nums}
+table.cf th:first-child,table.cf td:first-child{text-align:left; font-family:var(--f-body)}
+table.cf thead th{font-family:var(--f-body); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+table.cf tr.tot td{font-weight:600; color:var(--ink); border-top:1.5px solid var(--ink); border-bottom:3px double var(--ink)}
+table.cf td.neg{color:var(--bad)}
+.qual{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px}
+.q{border-left:3px solid var(--qc); padding:4px 0 4px 12px}
+.q b{display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--qc); margin-bottom:2px}
+.q p{margin:0; font-size:13px}
+.ratings{display:flex; flex-wrap:wrap; gap:18px; margin-top:12px}
+.rt{display:grid; gap:4px; font-size:12px; color:var(--muted)}
+.pips{display:flex; gap:3px} .pips i{width:18px; height:8px; border-radius:2px; background:var(--surface-2); border:1px solid var(--line)}
+.pips i.f{background:var(--c); border-color:var(--c)}
+.verdict{display:flex; gap:14px; align-items:flex-start; border:1px solid var(--line); background:var(--surface); border-radius:var(--radius); padding:14px 16px}
+.verdict .badge{flex:0 0 auto; font:600 11px var(--f-body); letter-spacing:.1em; text-transform:uppercase; padding:4px 8px; border-radius:4px; color:#fff; background:var(--vc,var(--muted))}
+.verdict p{margin:0; font-size:13.5px}
+.be{display:grid; gap:8px}
+.be .line{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; font-size:12.5px; padding-bottom:6px; border-bottom:1px dotted var(--line)}
+.be .line span:last-child{font-family:var(--f-data); color:var(--ink); font-weight:500}
+.status{display:inline-block; font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; padding:2px 7px; border-radius:3px; margin-left:6px}
+.status.ok{background:color-mix(in srgb,var(--good) 18%,transparent); color:var(--good)}
+.status.no{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.status.mid{background:color-mix(in srgb,var(--warn) 22%,transparent); color:var(--warn)}
+
+/* compare */
+.podium{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px}
+.pod{background:var(--surface); border:1px solid var(--line); border-top:5px solid var(--c); border-radius:var(--radius); padding:16px; display:grid; gap:6px; position:relative}
+.pod .rank{position:absolute; top:12px; right:14px; font-family:var(--f-display); font-size:34px; color:var(--c); opacity:.9}
+.pod h3{font-size:19px; padding-right:40px}
+.pod .v{font-family:var(--f-display); font-size:30px; color:var(--ink)}
+.pod .meta{display:grid; grid-template-columns:auto auto; gap:2px 10px; font-size:12px; color:var(--muted); justify-content:start}
+.pod .meta span:nth-child(even){font-family:var(--f-data); color:var(--fg)}
+.wts{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px 24px}
+.score-table td,.score-table th{text-align:center}
+.foot{color:var(--muted); font-size:11.5px; margin-top:24px; border-top:1px solid var(--line); padding-top:12px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow">FIN 6253 · Company Case</div>
+        <h1>Peak Services <em>strategy console</em></h1>
+        <div class="sub">Peak can pick one of three growth plans. Move the sliders to see which one is worth the most. All $ in millions.</div>
+      </div>
+      <div class="who"><b>Laura Lee Anzivino</b>UT Dallas EMBA · Oct 2026</div>
+    </div>
+    <details class="gloss">
+      <summary>Key terms</summary>
+      <dl>
+        <div><dt>NPV</dt> <dd>Value created, in today's dollars. Above $0 means the plan pays off.</dd></div>
+        <div><dt>EBITDA</dt> <dd>Yearly operating profit, before interest, taxes and depreciation.</dd></div>
+        <div><dt>WACC</dt> <dd>Peak's cost of money. Future cash is discounted at this rate.</dd></div>
+        <div><dt>Exit multiple</dt> <dd>What the business is worth after Year 3, as a multiple of EBITDA.</dd></div>
+        <div><dt>Synergies</dt> <dd>Extra profit from combining two companies.</dd></div>
+        <div><dt>IRR</dt> <dd>The plan's yearly return. Compare it with WACC.</dd></div>
+      </dl>
+    </details>
+    <div class="globals" style="--c:var(--gold)">
+      <div class="ctl"><div class="row"><label for="g_wacc">Discount rate (WACC)</label><output id="o_wacc"></output></div>
+        <input id="g_wacc" type="range" min="6" max="13" step="0.05" value="10.03"><div class="hint">Expected: 10.03%</div></div>
+      <div class="ctl"><div class="row"><label for="g_mult">Exit multiple (Year 3)</label><output id="o_mult"></output></div>
+        <input id="g_mult" type="range" min="7" max="14" step="0.1" value="11.5"><div class="hint">Case uses 11.5x EBITDA</div></div>
+      <div class="ctl"><div class="row"><label for="g_tax">Tax rate</label><output id="o_tax"></output></div>
+        <input id="g_tax" type="range" min="15" max="35" step="1" value="25"><div class="hint">Case uses 25%</div></div>
+      <div class="peakev"><div><div class="eyebrow" style="color:var(--hero-muted)">Peak's value today</div><span class="big num" id="peakEV">$500M</span> <small id="peakEVsub"></small></div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Views">
+  <div class="wrap"><div class="tabrow" role="tablist">
+    <button class="tab" role="tab" id="t-A" aria-controls="p-A" style="--c:var(--optA)"><span class="dot"></span>A · Expand <span class="tnpv" id="tn-A"></span></button>
+    <button class="tab" role="tab" id="t-B" aria-controls="p-B" style="--c:var(--optB)"><span class="dot"></span>B · Buy Apex <span class="tnpv" id="tn-B"></span></button>
+    <button class="tab" role="tab" id="t-C" aria-controls="p-C" style="--c:var(--optC)"><span class="dot"></span>C · AI platform <span class="tnpv" id="tn-C"></span></button>
+    <button class="tab" role="tab" id="t-X" aria-controls="p-X" style="--c:var(--gold)"><span class="dot"></span>Compare</button>
+  </div></div>
+</nav>
+
+<main class="wrap">
+
+<!-- ===================== A ===================== -->
+<section id="p-A" role="tabpanel" aria-labelledby="t-A" style="--c:var(--optA)">
+  <div class="panel-head">
+    <div><div class="eyebrow" style="color:var(--optA)">Option A</div><h2>Open offices in 5 new cities</h2>
+      <p>Costs $25M in Year 1 and $20M in Year 2. Revenue = clients × $77,900.</p></div>
+    <div class="presets" data-opt="A"><span class="lbl">Scenario</span><button class="chip" data-s="stress">Worst</button><button class="chip" data-s="down">Weak</button><button class="chip on" data-s="base">Expected</button><button class="chip" data-s="up">Strong</button></div>
+  </div>
+  <div class="layout">
+    <aside class="rail" aria-label="Expansion inputs">
+      <div class="grp"><h3>Clients</h3>
+        <div class="ctl"><div class="row"><label for="a_n">New clients in Year 1</label><output id="oa_n"></output></div><input id="a_n" type="range" min="200" max="1000" step="10" value="600"><div class="hint">Case range: 400–800</div></div>
+        <div class="ctl"><div class="row"><label for="a_g">Client growth per year</label><output id="oa_g"></output></div><input id="a_g" type="range" min="0" max="20" step="0.5" value="13"></div>
+        <div class="ctl"><label>How to count lost clients</label>
+          <div class="seg" id="a_model"><button data-v="net" class="on">Net growth</button><button data-v="cohort">Add, then subtract</button></div>
+          <div class="hint" id="a_modelhint"></div></div>
+        <div class="ctl" id="a_retwrap" hidden><div class="row"><label for="a_ret">Clients kept each year</label><output id="oa_ret"></output></div><input id="a_ret" type="range" min="80" max="96" step="1" value="90"></div>
+      </div>
+      <div class="grp"><h3>Money</h3>
+        <div class="ctl"><div class="row"><label for="a_arpc">Revenue per client</label><output id="oa_arpc"></output></div><input id="a_arpc" type="range" min="60000" max="95000" step="500" value="77900"></div>
+        <div class="ctl"><div class="row"><label for="a_m">EBITDA margin</label><output id="oa_m"></output></div><input id="a_m" type="range" min="12" max="22" step="0.25" value="18"><div class="hint">Profit per $1 of sales. Peak today: 18%</div></div>
+        <div class="ctl"><div class="row"><label for="a_i1">Cost in Year 1 / Year 2</label><output id="oa_i1"></output></div><input id="a_i1" type="range" min="15" max="40" step="1" value="25"><input id="a_i2" type="range" min="10" max="35" step="1" value="20" aria-label="Cost in year 2"></div>
+        <div class="ctl"><div class="row"><label for="a_p">Extra risk charge</label><output id="oa_p"></output></div><input id="a_p" type="range" min="0" max="5" step="0.25" value="0"><div class="hint">Added to the discount rate</div></div>
+      </div>
+      <button class="reset" data-reset="A">Reset</button>
+    </aside>
+    <div class="col">
+      <div class="kpis" id="k-A"></div>
+      <div class="grid2">
+        <div class="card"><h3>Cash by year</h3><p class="cap">Bars: cash in or out. Line: value so far.</p><div class="chartbox"><canvas id="c-A-cf"></canvas></div></div>
+        <div class="card"><h3>Clients, revenue &amp; profit</h3><p class="cap">Bars: revenue and EBITDA. Line: clients.</p><div class="chartbox"><canvas id="c-A-ops"></canvas></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>What matters most</h3><p class="cap">Longest bar = biggest effect on NPV</p><div class="chartbox"><canvas id="c-A-tor"></canvas></div></div>
+        <div class="card"><h3>Tipping points</h3><p class="cap">When this plan stops paying off, or loses to B</p><div class="be" id="be-A"></div></div>
+      </div>
+      <div class="card"><h3>The numbers</h3><div class="tbl-wrap"><table class="cf" id="tb-A"></table></div></div>
+      <div class="card"><h3>Pros and cons</h3>
+        <div class="qual" style="--qc:var(--optA)">
+          <div class="q"><b>Upside</b><p>Steady growth with little disruption. About $60M of new revenue a year by Year 3.</p></div>
+          <div class="q" style="--qc:var(--warn)"><b>Weak spot</b><p>Grows sales, but doesn't protect profit margins from AI competitors.</p></div>
+          <div class="q" style="--qc:var(--bad)"><b>What could go wrong</b><p>Hiring battles keep new clients near 400, and NPV drops to about $30M.</p></div>
+        </div>
+        <div class="ratings" data-r="2,3,3"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== B ===================== -->
+<section id="p-B" role="tabpanel" aria-labelledby="t-B" style="--c:var(--optB)" hidden>
+  <div class="panel-head">
+    <div><div class="eyebrow" style="color:var(--optB)">Option B · Recommended</div><h2>Buy Apex Group for $120M</h2>
+      <p>A regional accounting firm with $70M in revenue and $13M EBITDA. Its owners are retiring. Combining costs $5M a year for 2 years and should add $9M a year in synergies.</p></div>
+    <div class="presets" data-opt="B"><span class="lbl">Scenario</span><button class="chip" data-s="stress">Worst</button><button class="chip" data-s="down">Weak</button><button class="chip on" data-s="base">Expected</button><button class="chip" data-s="up">Strong</button><button class="chip" data-s="ai">AI's version</button></div>
+  </div>
+  <div class="layout">
+    <aside class="rail" aria-label="Acquisition inputs">
+      <div class="grp"><h3>Apex on its own</h3>
+        <div class="ctl"><div class="row"><label for="b_ap">Apex EBITDA today</label><output id="ob_ap"></output></div><input id="b_ap" type="range" min="9" max="17" step="0.1" value="13"></div>
+        <div class="ctl"><div class="row"><label for="b_g">Apex profit growth</label><output id="ob_g"></output></div><input id="b_g" type="range" min="-15" max="12" step="0.5" value="0"><div class="hint">Expected: flat. Below zero means losing clients.</div></div>
+        <div class="ctl"><div class="row"><label for="b_price">Purchase price</label><output id="ob_price"></output></div><input id="b_price" type="range" min="90" max="160" step="1" value="120"></div>
+      </div>
+      <div class="grp"><h3>Combining the firms</h3>
+        <div class="ctl"><div class="row"><label for="b_re">Synergies achieved</label><output id="ob_re"></output></div><input id="b_re" type="range" min="0" max="110" step="1" value="85"><div class="hint">Typical: 80–90% of the $9M plan</div></div>
+        <div class="ctl"><div class="row"><label for="b_ph">Synergies in Year 1</label><output id="ob_ph"></output></div><input id="b_ph" type="range" min="0" max="100" step="5" value="50"><div class="hint">Full amount from Year 2</div></div>
+        <div class="ctl"><div class="row"><label for="b_ic">Combining cost per year</label><output id="ob_ic"></output></div><input id="b_ic" type="range" min="0" max="12" step="0.5" value="5"></div>
+        <div class="ctl"><div class="row"><label for="b_p">Extra risk charge</label><output id="ob_p"></output></div><input id="b_p" type="range" min="0" max="5" step="0.25" value="0"><div class="hint">Added to the discount rate</div></div>
+      </div>
+      <div class="grp"><h3>Paying for it</h3>
+        <div class="ctl"><div class="row"><label for="b_debt">Share paid with debt</label><output id="ob_debt"></output></div><input id="b_debt" type="range" min="0" max="100" step="5" value="35"><div class="hint">Plan: 35%. The AI suggested 80%.</div></div>
+        <div class="ctl"><div class="row"><label for="b_cash">Cash on hand used</label><output id="ob_cash"></output></div><input id="b_cash" type="range" min="0" max="25" step="1" value="18"><div class="hint">$28M in the bank; keep $10M</div></div>
+      </div>
+      <button class="reset" data-reset="B">Reset</button>
+    </aside>
+    <div class="col">
+      <div class="kpis" id="k-B"></div>
+      <div class="grid2">
+        <div class="card"><h3>Cash by year</h3><p class="cap">$120M paid up front, then cash back each year</p><div class="chartbox"><canvas id="c-B-cf"></canvas></div></div>
+        <div class="card"><h3>Where the profit comes from</h3><p class="cap">Apex EBITDA + synergies – combining cost</p><div class="chartbox"><canvas id="c-B-ops"></canvas></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>What matters most</h3><p class="cap">Longest bar = biggest effect on NPV</p><div class="chartbox"><canvas id="c-B-tor"></canvas></div></div>
+        <div class="card"><h3>Debt check</h3><p class="cap">The loan limit: debt can't exceed 3.0× EBITDA</p><div class="be" id="fin-B"></div><div class="chartbox" style="height:120px;margin-top:8px"><canvas id="c-B-lev"></canvas></div></div>
+      </div>
+      <div class="card"><h3>Tipping points</h3><div class="be" id="be-B"></div></div>
+      <div class="card"><h3>The numbers</h3><div class="tbl-wrap"><table class="cf" id="tb-B"></table></div></div>
+      <div class="card"><h3>Pros and cons</h3>
+        <div class="qual" style="--qc:var(--optB)">
+          <div class="q"><b>Upside</b><p>Instant size: 26% more revenue and new industries. The price is below similar deals (9.2x vs. 10–13x EBITDA).</p></div>
+          <div class="q" style="--qc:var(--warn)"><b>Weak spot</b><p>Clients may leave with Apex's retiring owners, and staff may quit after the merger.</p></div>
+          <div class="q" style="--qc:var(--bad)"><b>What could go wrong</b><p>Synergies fall short and clients leave. In the worst case, NPV is about –$3M.</p></div>
+        </div>
+        <div class="ratings" data-r="4,4,4"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== C ===================== -->
+<section id="p-C" role="tabpanel" aria-labelledby="t-C" style="--c:var(--optC)" hidden>
+  <div class="panel-head">
+    <div><div class="eyebrow" style="color:var(--optC)">Option C</div><h2>Build an AI service platform</h2>
+      <p>Software that automates bookkeeping and reports. Costs $25M, then $10M. It reaches 25% of clients in Year 1, 75% in Year 2 and all clients in Year 3.</p></div>
+    <div class="presets" data-opt="C"><span class="lbl">Scenario</span><button class="chip" data-s="stress">Fails</button><button class="chip" data-s="down">Weak</button><button class="chip on" data-s="base">Expected</button><button class="chip" data-s="up">Strong</button></div>
+  </div>
+  <div class="layout">
+    <aside class="rail" aria-label="Technology platform inputs">
+      <div class="grp"><h3>Does it work?</h3>
+        <label class="toggle"><input type="checkbox" id="c_ok" checked> <span>Launch succeeds</span></label>
+        <div class="ctl"><div class="row"><label for="c_prob">Chance of success</label><output id="oc_prob"></output></div><input id="c_prob" type="range" min="20" max="100" step="5" value="75"><div class="hint">The AI review assumed 60%</div></div>
+        <div class="ctl"><label>Rollout speed</label><div class="seg" id="c_roll"><button data-v="slow">Slow</button><button data-v="plan" class="on">On plan</button><button data-v="fast">Fast</button></div></div>
+      </div>
+      <div class="grp"><h3>Benefits</h3>
+        <div class="ctl"><div class="row"><label for="c_ret">Clients kept each year</label><output id="oc_ret"></output></div><input id="c_ret" type="range" min="90" max="97" step="0.5" value="94"><div class="hint">Today: 90%. Top firms: 93%+</div></div>
+        <div class="ctl"><div class="row"><label for="c_pr">Price increase</label><output id="oc_pr"></output></div><input id="c_pr" type="range" min="0" max="5" step="0.25" value="3"></div>
+        <div class="ctl"><div class="row"><label for="c_cs">Yearly cost savings</label><output id="oc_cs"></output></div><input id="c_cs" type="range" min="0" max="10" step="0.25" value="6"></div>
+        <div class="ctl"><div class="row"><label for="c_m">Margin on new revenue</label><output id="oc_m"></output></div><input id="c_m" type="range" min="10" max="30" step="0.5" value="18"></div>
+        <div class="ctl"><div class="row"><label for="c_p">Extra risk charge</label><output id="oc_p"></output></div><input id="c_p" type="range" min="0" max="5" step="0.25" value="0"><div class="hint">Added to the discount rate</div></div>
+      </div>
+      <div class="grp"><h3>Settings</h3>
+        <label class="toggle"><input type="checkbox" id="c_full"> <span>Count the full price increase as profit<br><span class="hint">The template applies an 18% margin to it</span></span></label>
+        <label class="toggle"><input type="checkbox" id="c_cum"> <span>Saved clients stay in later years</span></label>
+      </div>
+      <button class="reset" data-reset="C">Reset</button>
+    </aside>
+    <div class="col">
+      <div class="kpis" id="k-C"></div>
+      <div class="grid2">
+        <div class="card"><h3>Cash by year</h3><p class="cap">Costs come first. The payoff comes in Year 3.</p><div class="chartbox"><canvas id="c-C-cf"></canvas></div></div>
+        <div class="card"><h3>Where the profit comes from</h3><p class="cap">Kept clients, higher prices and cost savings</p><div class="chartbox"><canvas id="c-C-ops"></canvas></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>What matters most</h3><p class="cap">Assumes the launch succeeds</p><div class="chartbox"><canvas id="c-C-tor"></canvas></div></div>
+        <div class="card"><h3>Success vs. failure</h3><p class="cap">Expected NPV at each chance of success</p><div class="chartbox"><canvas id="c-C-prob"></canvas></div><div class="be" id="be-C" style="margin-top:10px"></div></div>
+      </div>
+      <div class="card"><h3>The numbers</h3><div class="tbl-wrap"><table class="cf" id="tb-C"></table></div></div>
+      <div class="card"><h3>Pros and cons</h3>
+        <div class="qual" style="--qc:var(--optC)">
+          <div class="q"><b>Upside</b><p>Lower costs, more loyal clients and higher prices.</p></div>
+          <div class="q" style="--qc:var(--warn)"><b>Weak spot</b><p>Rivals can copy it, which wipes out the edge.</p></div>
+          <div class="q" style="--qc:var(--bad)"><b>What could go wrong</b><p>If it fails, the $35M is lost (NPV about –$31M).</p></div>
+        </div>
+        <div class="ratings" data-r="5,5,5"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COMPARE ===================== -->
+<section id="p-X" role="tabpanel" aria-labelledby="t-X" style="--c:var(--gold)" hidden>
+  <div class="panel-head">
+    <div><div class="eyebrow">Side by side</div><h2>Which option wins?</h2>
+      <p>Uses your settings from every tab. Risk-adjusted NPV averages each option's four scenarios.</p></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+  <div class="podium" id="podium" style="margin-top:16px"></div>
+  <div class="grid2" style="margin-top:18px">
+    <div class="card"><h3>NPV three ways</h3><p class="cap">Your settings, risk-adjusted, and worst case</p><div class="chartbox tall"><canvas id="c-X-npv"></canvas></div></div>
+    <div class="card"><h3>Exit multiple test</h3><p class="cap">B beats A only above about 9.3x</p><div class="chartbox tall"><canvas id="c-X-mult"></canvas></div></div>
+  </div>
+  <div class="grid2" style="margin-top:18px">
+    <div class="card"><h3>Discount rate test</h3><p class="cap">NPV as the rate rises from 7% to 14%</p><div class="chartbox"><canvas id="c-X-wacc"></canvas></div></div>
+    <div class="card"><h3>Risk, difficulty &amp; fit</h3><p class="cap">1 = low, 5 = high</p><div class="chartbox"><canvas id="c-X-radar"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <h3>Your scorecard</h3>
+    <p class="cap">Choose what matters most. Each factor is scored 0–10.</p>
+    <div class="wts" style="--c:var(--gold)">
+      <div class="ctl"><div class="row"><label for="w_v">Value (NPV)</label><output id="ow_v"></output></div><input id="w_v" type="range" min="0" max="10" step="1" value="5"></div>
+      <div class="ctl"><div class="row"><label for="w_r">Low risk</label><output id="ow_r"></output></div><input id="w_r" type="range" min="0" max="10" step="1" value="2"></div>
+      <div class="ctl"><div class="row"><label for="w_e">Easy to do</label><output id="ow_e"></output></div><input id="w_e" type="range" min="0" max="10" step="1" value="1"></div>
+      <div class="ctl"><div class="row"><label for="w_f">Strategic fit</label><output id="ow_f"></output></div><input id="w_f" type="range" min="0" max="10" step="1" value="2"></div>
+    </div>
+    <div class="presets" style="margin-top:12px"><button class="chip" data-w="5,2,1,2">Balanced</button><button class="chip" data-w="2,6,2,0">Play it safe</button><button class="chip" data-w="2,0,0,8">Strategy first</button><button class="chip" data-w="10,0,0,0">Money only</button></div>
+    <div class="tbl-wrap" style="margin-top:12px"><table class="cf score-table" id="tb-score"></table></div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <h3>All scenarios</h3><p class="cap">NPV for each case. C's worst case is a failed launch.</p>
+    <div class="tbl-wrap"><table class="cf" id="tb-scen"></table></div>
+  </div>
+  <p class="foot">Same math as the Excel model: 3 years of after-tax cash, plus an exit value (multiple × Year-3 EBITDA), discounted at WACC. Peak's value = 50% DCF + 25% industry multiple + 25% deal multiple.</p>
+</section>
+</main>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const val=id=>parseFloat(document.getElementById(id).value);
+const fmt=(x,d=1)=>(x<0?'–$':'$')+Math.abs(x).toFixed(d)+'M';
+const pct=(x,d=1)=>(x*100).toFixed(d)+'%';
+
+/* ---------- finance helpers ---------- */
+const npv=(r,cfs)=>cfs.reduce((s,c,i)=>s+c/Math.pow(1+r,i),0);
+function irr(cfs){let lo=-0.99,hi=20,f=r=>npv(r,cfs);if(f(lo)*f(hi)>0)return NaN;for(let i=0;i<200;i++){const m=(lo+hi)/2;(f(lo)*f(m)<=0)?hi=m:lo=m}return (lo+hi)/2}
+function solve(fn,lo,hi){let flo=fn(lo),fhi=fn(hi);if(isNaN(flo)||isNaN(fhi)||flo*fhi>0)return NaN;for(let i=0;i<100;i++){const m=(lo+hi)/2,fm=fn(m);(flo*fm<=0)?(hi=m):(lo=m,flo=fm)}return (lo+hi)/2}
+
+/* ---------- state ---------- */
+const BASE={A:{n:600,g:.13,model:'net',ret:.90,arpc:77900,m:.18,i1:25,i2:20,p:0},
+ B:{ap:13,g:0,price:120,re:.85,ph:.5,ic:5,p:0,debt:.35,cash:18,ai:false},
+ C:{ok:true,prob:.75,roll:'plan',ret:.94,pr:.03,cs:6,m:.18,p:0,full:false,cum:false}};
+const S=JSON.parse(JSON.stringify(BASE));
+const G={wacc:.1003,mult:11.5,tax:.25};
+const ROLL={plan:[.25,.75,1],slow:[0,.5,1],fast:[.5,1,1]};
+
+/* ---------- models ---------- */
+function modelA(s,g=G){const r=g.wacc+s.p;let c=[];if(s.model==='net'){c=[0,1,2].map(t=>s.n*Math.pow(1+s.g,t))}else{let prev=0;c=[0,1,2].map(t=>{const nw=s.n*Math.pow(1+s.g,t);prev=prev*s.ret+nw;return prev})}
+ const rev=c.map(x=>x*s.arpc/1e6),e=rev.map(x=>x*s.m),no=e.map(x=>x*(1-g.tax)),inv=[s.i1,s.i2,0];
+ const fcf=no.map((x,i)=>x-inv[i]),hv=g.mult*e[2],cfs=[0,fcf[0],fcf[1],fcf[2]+hv];
+ return {c,rev,e,no,inv,fcf,hv,cfs,r,npv:npv(r,cfs),irr:irr(cfs),cap:s.i1+s.i2}}
+function modelB(s,g=G){const r=(s.ai?0.0619:g.wacc)+s.p;const a=[1,2,3].map(t=>s.ap*Math.pow(1+s.g,t));const ph=[s.ph,1,1];
+ const syn=ph.map(p=>9*s.re*p),ic=[s.ic,s.ic,0],e=a.map((x,i)=>x+syn[i]-ic[i]),no=e.map(x=>x*(1-g.tax));
+ const hv=g.mult*(a[2]+syn[2]),cfs=[-s.price,no[0],no[1],no[2]+hv];
+ return {a,syn,ic,e,no,hv,cfs,r,npv:npv(r,cfs),irr:irr(cfs),cap:s.price+2*s.ic}}
+function modelC(s,g=G,forceOk){const ok=forceOk===undefined?s.ok:forceOk;const r=g.wacc+s.p,av=ROLL[s.roll],cl=3400,arpc=77900,dr=s.ret-.90;
+ let retb;if(s.cum){let st=0;retb=av.map(a=>{st=st*s.ret+cl*a*dr;return st*arpc/1e6})}else retb=av.map(a=>cl*a*dr*arpc/1e6);
+ const prb=av.map(a=>cl*arpc/1e6*a*s.pr);
+ const eRet=retb.map(x=>x*s.m),ePr=prb.map(x=>x*(s.full?1:s.m)),sav=av.map(a=>s.cs*a);
+ let e=av.map((_,i)=>eRet[i]+ePr[i]+sav[i]);if(!ok)e=[0,0,0];
+ const no=e.map(x=>x*(1-g.tax)),inv=[25,10,0],fcf=no.map((x,i)=>x-inv[i]),hv=g.mult*e[2],cfs=[0,fcf[0],fcf[1],fcf[2]+hv];
+ return {av,retb,prb,eRet:ok?eRet:[0,0,0],ePr:ok?ePr:[0,0,0],sav:ok?sav:[0,0,0],e,no,inv,fcf,hv,cfs,r,npv:npv(r,cfs),irr:irr(cfs),cap:35}}
+function cExpected(s,g=G){return s.prob*modelC(s,g,true).npv+(1-s.prob)*modelC(s,g,false).npv}
+
+/* scenarios (fixed definitions; global WACC/mult/tax and each option's risk charge apply) */
+const SC={A:{stress:{n:400,g:.06,m:.16,mult:10},down:{n:400,g:.13,m:.17},base:{},up:{n:800,g:.13,m:.185}},
+ B:{stress:{g:-.10,re:.5,mult:9.2},down:{g:-.05,re:.8},base:{},up:{g:.05,re:.9},ai:{g:.10,re:1,ph:1,ai:true}},
+ C:{stress:{ok:false},down:{ret:.92,pr:.02,cs:4.5},base:{},up:{pr:.04}}};
+const W8={A:[.1,.2,.5,.2],B:[.1,.2,.5,.2],C:[.25,.2,.4,.15]};
+function scenNPV(o,k){const sc=SC[o][k],base={...BASE[o],p:S[o].p},s={...base,...sc};const g={...G};if(sc.mult)g.mult=sc.mult;
+ return o==='A'?modelA(s,g).npv:o==='B'?modelB({...s,ai:false},g).npv:modelC(s,g).npv}
+function probW(o){return ['stress','down','base','up'].reduce((t,k,i)=>t+W8[o][i]*scenNPV(o,k),0)}
+
+/* Peak on its own */
+function peakEV(){const S25=264.96,c=(148+53.3+16)/S25,nwc=20/S25,cap=36/S25;let s=S25,nw=20,k=36,f=[];
+ [7,8,9].forEach(d=>{s*=1.08;const ebit=s*(1-c)-d,no=ebit*(1-G.tax),nn=s*nwc,nk=s*cap;f.push(no-(nk-k)-(nn-nw));nw=nn;k=nk});
+ const w=G.wacc,hv=f[2]*1.03/(w-.03);const dcf=f[0]/(1+w)+f[1]/(1+w)**2+(f[2]+hv)/(1+w)**3;return {dcf,blend:.5*dcf+.25*548.09+.25*571.92}}
+
+/* ---------- theme-aware chart colours ---------- */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function T(){return {fg:css('--fg'),muted:css('--muted'),line:css('--line'),ink:css('--ink'),A:css('--optA'),B:css('--optB'),C:css('--optC'),gold:css('--gold'),bad:css('--bad'),good:css('--good'),warn:css('--warn'),surface:css('--surface')}}
+const alpha=(hex,a)=>{const h=hex.replace('#','');const n=parseInt(h.length===3?h.split('').map(x=>x+x).join(''):h,16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`};
+Chart.defaults.font.family="'IBM Plex Sans', system-ui, sans-serif";Chart.defaults.font.size=11;Chart.defaults.animation.duration=250;
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)Chart.defaults.animation=false;
+const charts={};
+function mk(id,cfg){if(charts[id]){charts[id].destroy()}charts[id]=new Chart(document.getElementById(id),cfg);return charts[id]}
+function axes(t,yTitle,extra={}){return {x:{grid:{display:false},ticks:{color:t.muted},border:{color:t.line}},y:{grid:{color:alpha(t.line.length===7?t.line:'#888888',.7)},ticks:{color:t.muted,callback:v=>'$'+v},border:{display:false},title:{display:!!yTitle,text:yTitle,color:t.muted}},...extra}}
+const legend=t=>({labels:{color:t.fg,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'rectRounded'}});
+const tip={callbacks:{label:c=>`${c.dataset.label}: ${typeof c.raw==='number'?fmt(c.raw):c.raw}`}};
+
+function cfChart(id,m,col){const t=T();const labels=['Yr 0','Yr 1','Yr 2','Yr 3'];
+ let opF,inv0;if(m.fcf){opF=[0,...m.fcf];inv0=[0,0,0,0]}else{opF=[0,...m.no];inv0=[m.cfs[0],0,0,0]}
+ const hv=[0,0,0,m.hv];let run=0;const cum=m.cfs.map((c,i)=>run+=c/Math.pow(1+m.r,i));
+ mk(id,{type:'bar',data:{labels,datasets:[
+  {label:'Cash flow',data:opF,backgroundColor:opF.map(v=>v<0?alpha(t.bad,.75):col),stack:'s',borderRadius:3},
+  ...(m.fcf?[]:[{label:'Purchase price',data:inv0,backgroundColor:alpha(t.bad,.75),stack:'s',borderRadius:3}]),
+  {label:'Exit value',data:hv,backgroundColor:alpha(col,.35),borderColor:col,borderWidth:1,stack:'s',borderRadius:3},
+  {type:'line',label:'Value so far (NPV)',data:cum,borderColor:t.gold,backgroundColor:t.gold,pointRadius:[3,3,3,6],borderWidth:2,tension:.25}]},
+ options:{maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:tip},scales:axes(t)}})}
+
+function tornado(id,base,items,col){const t=T();items.forEach(it=>{it.span=Math.abs(it.hi-it.lo)});items.sort((a,b)=>b.span-a.span);
+ mk(id,{type:'bar',data:{labels:items.map(i=>i.label),datasets:[
+  {label:'Worse',data:items.map(i=>[base,i.lo]),backgroundColor:alpha(t.bad,.65),borderRadius:2},
+  {label:'Better',data:items.map(i=>[base,i.hi]),backgroundColor:alpha(col,.8),borderRadius:2}]},
+ options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:{callbacks:{label:c=>`${c.dataset.label} (${items[c.dataIndex][c.datasetIndex?'hl':'ll']}): ${fmt(c.raw[1])}`}}},
+  scales:{x:{grid:{color:alpha('#888888',.25)},ticks:{color:t.muted,callback:v=>'$'+v},border:{display:false}},y:{stacked:true,grid:{display:false},ticks:{color:t.fg},border:{color:t.line}}}}})}
+
+function kpis(id,items){$(id).innerHTML=items.map(([k,v,d,lead])=>`<div class="kpi"><span class="k">${k}</span><span class="v num${lead?' lead':''}">${v}</span><span class="d">${d||''}</span></div>`).join('')}
+function table(id,head,rows){$(id).innerHTML=`<thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.cls||''}">${r.v.map((c,i)=>i===0?`<td>${c}</td>`:`<td class="${typeof c==='number'&&c<-0.0001?'neg':''}">${typeof c==='number'?(Math.abs(c)<1e-9?'–':(c<0?'('+Math.abs(c).toFixed(1)+')':c.toFixed(1))):c}</td>`).join('')}</tr>`).join('')}</tbody>`}
+const delta=(x,ref)=>{const d=x-ref;if(Math.abs(d)<0.05)return '<span class="delta">Expected case</span>';return `<span class="delta ${d>=0?'up':'down'}">${d>=0?'+':'–'}$${Math.abs(d).toFixed(1)}M vs. expected</span>`};
+const BASEN={A:71.18,B:87.65,C:60.81};
+const pvHVshare=m=>(m.hv/Math.pow(1+m.r,3))/m.npv;
+const lines=(id,rows)=>$(id).innerHTML=rows.map(([a,b])=>`<div class="line"><span>${a}</span><span>${b}</span></div>`).join('');
+const yesno=b=>b?'<span class="status ok">Yes</span>':'<span class="status no">No</span>';
+
+/* ---------- renderers ---------- */
+function renderA(){const s=S.A,m=modelA(s),t=T();
+ kpis('#k-A',[['NPV',fmt(m.npv),delta(m.npv,BASEN.A),1],['IRR',isNaN(m.irr)?'n/a':pct(m.irr,0),'Looks high: no upfront cost'],['Year-3 EBITDA',fmt(m.e[2]),`${Math.round(m.c[2])} clients`],['Risk-adjusted NPV',fmt(probW('A')),'Average of 4 scenarios'],['Total cost',fmt(m.cap,0),'$'+(m.npv/m.cap).toFixed(2)+' of NPV per $1']]);
+ cfChart('c-A-cf',m,t.A);
+ mk('c-A-ops',{type:'bar',data:{labels:['Yr 1','Yr 2','Yr 3'],datasets:[{label:'Revenue',data:m.rev,backgroundColor:alpha(t.A,.35),borderRadius:3,yAxisID:'y'},{label:'EBITDA',data:m.e,backgroundColor:t.A,borderRadius:3,yAxisID:'y'},{type:'line',label:'Clients',data:m.c,borderColor:t.gold,backgroundColor:t.gold,yAxisID:'y1',tension:.3}]},
+  options:{maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:{callbacks:{label:c=>c.dataset.label==='Clients'?`Clients: ${Math.round(c.raw)}`:`${c.dataset.label}: ${fmt(c.raw)}`}}},scales:{...axes(t),y1:{position:'right',grid:{display:false},ticks:{color:t.muted},border:{display:false}}}}});
+ const f=(o)=>modelA({...s,...o}).npv;
+ tornado('c-A-tor',m.npv,[{label:'New clients',lo:f({n:400}),hi:f({n:800}),ll:'400',hl:'800'},{label:'Client growth',lo:f({g:.06}),hi:f({g:.18}),ll:'6%',hl:'18%'},{label:'EBITDA margin',lo:f({m:.16}),hi:f({m:.20}),ll:'16%',hl:'20%'},{label:'Revenue per client',lo:f({arpc:70000}),hi:f({arpc:85000}),ll:'$70k',hl:'$85k'},{label:'Exit multiple',lo:modelA(s,{...G,mult:9.2}).npv,hi:modelA(s,{...G,mult:13}).npv,ll:'9.2x',hl:'13x'},{label:'Discount rate',lo:modelA(s,{...G,wacc:G.wacc+.02}).npv,hi:modelA(s,{...G,wacc:G.wacc-.02}).npv,ll:'+2 pts',hl:'–2 pts'}],t.A);
+ const nB=modelB(S.B).npv,beZ=solve(n=>modelA({...s,n}).npv,10,3000),beB=solve(n=>modelA({...s,n}).npv-nB,10,5000),beM=solve(mm=>modelA({...s,m:mm}).npv,0.001,.6);
+ lines('#be-A',[['Clients needed to break even',isNaN(beZ)?'n/a':Math.round(beZ)],['Clients needed to beat B',isNaN(beB)?'n/a':Math.round(beB)],['Margin needed to break even',isNaN(beM)?'n/a':pct(beM)],['NPV per $1 invested','$'+(m.npv/m.cap).toFixed(2)],['Beats B right now?',yesno(m.npv>nB)]]);
+ table('#tb-A',['$M','Yr 1','Yr 2','Yr 3'],[{v:['Clients',...m.c.map(x=>Math.round(x).toString())]},{v:['Revenue',...m.rev]},{v:['EBITDA',...m.e]},{v:['Tax',...m.e.map(x=>-x*G.tax)]},{v:['After-tax profit',...m.no]},{v:['Investment',...m.inv.map(x=>-x)]},{v:['Cash flow',...m.fcf]},{v:['Exit value',0,0,m.hv]},{v:['Total',m.cfs[1],m.cfs[2],m.cfs[3]],cls:'tot'}]);
+}
+function renderB(){const s=S.B,m=modelB(s),t=T();
+ kpis('#k-B',[['NPV',fmt(m.npv),delta(m.npv,BASEN.B)+(s.ai?' · at the AI\'s 6.2% rate':''),1],['IRR',pct(m.irr),'vs. '+pct(m.r)+' required'],['Year-3 EBITDA',fmt(m.e[2]),`Apex ${fmt(m.a[2])} + synergies ${fmt(m.syn[2])}`],['Risk-adjusted NPV',fmt(probW('B')),'Average of 4 scenarios'],['Price paid',(s.price/s.ap).toFixed(1)+'x','× Apex EBITDA · deals: 10–13x']]);
+ cfChart('c-B-cf',m,t.B);
+ mk('c-B-ops',{type:'bar',data:{labels:['Yr 1','Yr 2','Yr 3'],datasets:[{label:'Apex EBITDA',data:m.a,backgroundColor:t.B,stack:'s',borderRadius:2},{label:'Synergies',data:m.syn,backgroundColor:alpha(t.B,.45),stack:'s',borderRadius:2},{label:'Combining cost',data:m.ic.map(x=>-x),backgroundColor:alpha(t.bad,.7),stack:'s',borderRadius:2}]},
+  options:{maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:tip},scales:{...axes(t),x:{...axes(t).x,stacked:true},y:{...axes(t).y,stacked:true}}}});
+ const f=o=>modelB({...s,...o}).npv;
+ tornado('c-B-tor',m.npv,[{label:'Synergies achieved',lo:f({re:.6}),hi:f({re:1}),ll:'60%',hl:'100%'},{label:'Apex profit growth',lo:f({g:-.08}),hi:f({g:.06}),ll:'–8%',hl:'+6%'},{label:'Exit multiple',lo:modelB(s,{...G,mult:9.2}).npv,hi:modelB(s,{...G,mult:13}).npv,ll:'9.2x',hl:'13x'},{label:'Purchase price',lo:f({price:135}),hi:f({price:105}),ll:'$135M',hl:'$105M'},{label:'Discount rate',lo:modelB(s,{...G,wacc:G.wacc+.02}).npv,hi:modelB(s,{...G,wacc:G.wacc-.02}).npv,ll:'+2 pts',hl:'–2 pts'},{label:'Combining cost',lo:f({ic:8}),hi:f({ic:3}),ll:'$8M',hl:'$3M'}],t.B);
+ const debt=s.price*s.debt,cash=Math.min(s.cash,s.price-debt),eq=Math.max(0,s.price-debt-cash),tot=57.2+debt,E=47.66+s.ap,lev=tot/E,dta=tot/(165+s.price),head=3*E-tot,cush=1-tot/(3*E);
+ const st=lev>2.75?'no':lev>2.2?'mid':'ok';
+ lines('#fin-B',[['Debt / cash / new equity',`$${debt.toFixed(0)} / $${cash.toFixed(0)} / $${eq.toFixed(0)}M`],['Debt ÷ EBITDA',`${lev.toFixed(2)}x <span class="status ${st}">${st==='ok'?'Safe':st==='mid'?'Tight':'Risky'}</span>`],['Debt ÷ assets (goal 35%)',`${pct(dta,0)} <span class="status ${dta>.4?'no':'ok'}">${dta>.4?'Too high':'On target'}</span>`],['Room left under the limit',fmt(head)],['Profit drop before hitting the limit',pct(Math.max(cush,0),0)],['Yearly interest (8%)',fmt(debt*.08)]]);
+ mk('c-B-lev',{type:'bar',data:{labels:['Debt ÷ EBITDA'],datasets:[{label:'After the deal',data:[lev],backgroundColor:lev>2.75?t.bad:lev>2.2?t.warn:t.good,borderRadius:3,barThickness:22}]},
+  options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toFixed(2)+'x'}}},scales:{x:{min:0,max:3.5,grid:{color:c=>c.tick.value===3?t.bad:alpha('#888888',.2),lineWidth:c=>c.tick.value===3?2:1},ticks:{color:t.muted,stepSize:.5,callback:v=>v+'x'},border:{display:false}},y:{grid:{display:false},ticks:{color:t.fg}}}}});
+ const nA=modelA(S.A).npv,beg=solve(g=>modelB({...s,g}).npv-nA,-.6,.6),ber=solve(re=>modelB({...s,re}).npv-nA,-1,3),bem=solve(mm=>modelB(s,{...G,mult:mm}).npv-modelA(S.A,{...G,mult:mm}).npv,2,25),bez=solve(re=>modelB({...s,re}).npv,-2,3);
+ lines('#be-B',[['Apex growth where B ties A',isNaN(beg)?'n/a':pct(beg)],['Synergies needed to beat A',isNaN(ber)?'n/a':pct(ber,0)],['Exit multiple needed to beat A',isNaN(bem)?'n/a':bem.toFixed(1)+'x'],['Synergies needed to break even',isNaN(bez)?'n/a':(bez<=0?'None':pct(bez,0))],['NPV with no synergies',fmt(f({re:0}))],['Beats A right now?',yesno(m.npv>nA)]]);
+ table('#tb-B',['$M','Yr 0','Yr 1','Yr 2','Yr 3'],[{v:['Apex EBITDA',0,...m.a]},{v:['Synergies',0,...m.syn]},{v:['Combining cost',0,...m.ic.map(x=>-x)]},{v:['EBITDA',0,...m.e]},{v:['Tax',0,...m.e.map(x=>-x*G.tax)]},{v:['After-tax profit',0,...m.no]},{v:['Purchase price',-s.price,0,0,0]},{v:['Exit value',0,0,0,m.hv]},{v:['Total',...m.cfs],cls:'tot'}]);
+}
+function renderC(){const s=S.C,m=modelC(s),t=T(),ms=modelC(s,G,true),ex=cExpected(s);
+ kpis('#k-C',[['NPV'+(s.ok?'':' (failed)'),fmt(m.npv),delta(m.npv,BASEN.C),1],['Expected NPV',fmt(ex),pct(s.prob,0)+' chance it works'],['IRR',isNaN(m.irr)?'n/a':pct(m.irr,0),'Looks high: no upfront cost'],['Year-3 EBITDA',fmt(m.e[2]),'Incl. '+fmt(m.sav[2])+' savings'],['Risk-adjusted NPV',fmt(probW('C')),'Average of 4 scenarios']]);
+ cfChart('c-C-cf',m,t.C);
+ mk('c-C-ops',{type:'bar',data:{labels:['Yr 1','Yr 2','Yr 3'],datasets:[{label:'Kept clients',data:m.eRet,backgroundColor:t.C,stack:'s',borderRadius:2},{label:'Higher prices',data:m.ePr,backgroundColor:alpha(t.C,.55),stack:'s',borderRadius:2},{label:'Cost savings',data:m.sav,backgroundColor:t.gold,stack:'s',borderRadius:2}]},
+  options:{maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:tip},scales:{...axes(t),x:{...axes(t).x,stacked:true},y:{...axes(t).y,stacked:true}}}});
+ const f=o=>modelC({...s,...o},G,true).npv;
+ tornado('c-C-tor',ms.npv,[{label:'Cost savings',lo:f({cs:3}),hi:f({cs:8}),ll:'$3M',hl:'$8M'},{label:'Price increase',lo:f({pr:.02}),hi:f({pr:.04}),ll:'2%',hl:'4%'},{label:'Clients kept',lo:f({ret:.92}),hi:f({ret:.96}),ll:'92%',hl:'96%'},{label:'Rollout speed',lo:f({roll:'slow'}),hi:f({roll:'fast'}),ll:'slow',hl:'fast'},{label:'Exit multiple',lo:modelC(s,{...G,mult:9.2},true).npv,hi:modelC(s,{...G,mult:13},true).npv,ll:'9.2x',hl:'13x'},{label:'Discount rate',lo:modelC(s,{...G,wacc:G.wacc+.02},true).npv,hi:modelC(s,{...G,wacc:G.wacc-.02},true).npv,ll:'+2 pts',hl:'–2 pts'}],t.C);
+ const ps=[];for(let p=0;p<=100;p+=5)ps.push(p);const nf=modelC(s,G,false).npv,nA=modelA(S.A).npv,nB=modelB(S.B).npv;
+ mk('c-C-prob',{type:'line',data:{labels:ps.map(p=>p+'%'),datasets:[{label:'C expected NPV',data:ps.map(p=>p/100*ms.npv+(1-p/100)*nf),borderColor:t.C,backgroundColor:alpha(t.C,.12),fill:true,pointRadius:0,borderWidth:2.5},{label:'A',data:ps.map(()=>nA),borderColor:t.A,borderDash:[5,4],pointRadius:0,borderWidth:1.5},{label:'B',data:ps.map(()=>nB),borderColor:t.B,borderDash:[5,4],pointRadius:0,borderWidth:1.5}]},
+  options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:legend(t),tooltip:tip},scales:{...axes(t),x:{...axes(t).x,ticks:{color:t.muted,maxTicksLimit:6}}}}});
+ const pA=(nA-nf)/(ms.npv-nf),pB=(nB-nf)/(ms.npv-nf),p0=-nf/(ms.npv-nf);
+ const show=p=>p>1?'<span class="status no">Never</span>':pct(Math.max(p,0),0);
+ lines('#be-C',[['Chance needed to break even',show(p0)],['Chance needed to beat A',show(pA)],['Chance needed to beat B',show(pB)]]);
+ table('#tb-C',['$M','Yr 1','Yr 2','Yr 3'],[{v:['Clients reached',...m.av.map(a=>pct(a,0))]},{v:['Revenue from kept clients',...m.retb.map(x=>s.ok?x:0)]},{v:['Revenue from higher prices',...m.prb.map(x=>s.ok?x:0)]},{v:['Profit from new revenue',...m.eRet.map((x,i)=>x+m.ePr[i])]},{v:['Cost savings',...m.sav]},{v:['EBITDA',...m.e]},{v:['Tax',...m.e.map(x=>-x*G.tax)]},{v:['Investment',-25,-10,0]},{v:['Cash flow',...m.fcf]},{v:['Exit value',0,0,m.hv]},{v:['Total',m.cfs[1],m.cfs[2],m.cfs[3]],cls:'tot'}]);
+}
+const RT={A:[2,3,3],B:[4,4,4],C:[5,5,5]};
+function renderX(){const t=T();const cur={A:modelA(S.A).npv,B:modelB({...S.B,ai:false}).npv,C:modelC(S.C).npv};
+ const pw={A:probW('A'),B:probW('B'),C:probW('C')};const st={A:scenNPV('A','stress'),B:scenNPV('B','stress'),C:scenNPV('C','stress')};
+ const cap={A:S.A.i1+S.A.i2,B:S.B.price+2*S.B.ic,C:35};const names={A:'Expand to 5 cities',B:'Buy Apex',C:'AI platform'};const cols={A:t.A,B:t.B,C:t.C};
+ const w={v:val('w_v'),r:val('w_r'),e:val('w_e'),f:val('w_f')};['v','r','e','f'].forEach(k=>$('#ow_'+k).textContent=w[k]);
+ const pv=Object.values(pw),mx=Math.max(...pv),mn=Math.min(...pv,0);
+ const sc={};['A','B','C'].forEach(o=>{const v=mx===mn?10:10*(pw[o]-mn)/(mx-mn),r=10*(5-RT[o][0])/4,e=10*(5-RT[o][1])/4,f=10*(RT[o][2]-1)/4,tw=w.v+w.r+w.e+w.f||1;sc[o]={v,r,e,f,tot:(w.v*v+w.r*r+w.e*e+w.f*f)/tw}});
+ const order=['A','B','C'].sort((a,b)=>sc[b].tot-sc[a].tot);const byPW=['A','B','C'].sort((a,b)=>pw[b]-pw[a]);
+ $('#podium').innerHTML=order.map((o,i)=>`<div class="pod" style="--c:var(--opt${o})"><span class="rank">${i+1}</span><div class="eyebrow" style="color:var(--opt${o})">Option ${o}</div><h3>${names[o]}</h3><span class="v num">${fmt(pw[o])}</span><span class="d" style="font-size:12px;color:var(--muted)">risk-adjusted NPV</span><div class="meta"><span>Your settings</span><span>${fmt(cur[o])}</span><span>Worst case</span><span>${fmt(st[o])}</span><span>Upfront cost</span><span>$${cap[o].toFixed(0)}M</span><span>Score</span><span>${sc[o].tot.toFixed(1)} / 10</span></div></div>`).join('');
+ const top=order[0];const vc={A:'var(--optA)',B:'var(--optB)',C:'var(--optC)'}[top];
+ const msg=top==='B'?`<b>Buy Apex</b> is worth the most (${fmt(pw.B)} risk-adjusted). It stays on top if synergies stay above 67% and the exit multiple stays above 9.3x. Pay with 35% debt, not 80%.`
+  :top==='A'?`<b>Expanding</b> wins with these settings. It puts less money at risk and still makes money in the worst case (${fmt(st.A)}).`
+  :`<b>The AI platform</b> wins because strategic fit is weighted heavily. It still has a 25% chance of losing $35M.`;
+ $('#verdict').style.setProperty('--vc',vc);$('#verdict').innerHTML=`<span class="badge">Winner: ${top}</span><p>${msg} <span style="color:var(--muted)">Ranked by value: ${byPW.join(' › ')}.</span></p>`;
+ table('#tb-score',['Factor (0–10)','A','B','C','Weight'],[{v:['Value',sc.A.v.toFixed(1),sc.B.v.toFixed(1),sc.C.v.toFixed(1),String(w.v)]},{v:['Low risk',sc.A.r.toFixed(1),sc.B.r.toFixed(1),sc.C.r.toFixed(1),String(w.r)]},{v:['Easy to do',sc.A.e.toFixed(1),sc.B.e.toFixed(1),sc.C.e.toFixed(1),String(w.e)]},{v:['Strategic fit',sc.A.f.toFixed(1),sc.B.f.toFixed(1),sc.C.f.toFixed(1),String(w.f)]},{v:['Total score',sc.A.tot.toFixed(2),sc.B.tot.toFixed(2),sc.C.tot.toFixed(2),''],cls:'tot'}]);
+ const ks=['stress','down','base','up'];
+ table('#tb-scen',['Option','Worst','Weak','Expected','Strong','Risk-adjusted'],['A','B','C'].map(o=>({v:[`${o} · ${names[o]}`,...ks.map(k=>scenNPV(o,k)),pw[o]]})));
+ mk('c-X-npv',{type:'bar',data:{labels:['A · Expand','B · Buy Apex','C · AI platform'],datasets:[{label:'Your settings',data:[cur.A,cur.B,cur.C],backgroundColor:[t.A,t.B,t.C],borderRadius:3},{label:'Risk-adjusted',data:[pw.A,pw.B,pw.C],backgroundColor:[alpha(t.A,.5),alpha(t.B,.5),alpha(t.C,.5)],borderRadius:3},{label:'Worst case',data:[st.A,st.B,st.C],backgroundColor:alpha(t.muted||'#888888',.55),borderRadius:3}]},
+  options:{maintainAspectRatio:false,plugins:{legend:legend(t),tooltip:tip},scales:axes(t)}});
+ const ms=[];for(let x=8;x<=14.001;x+=.5)ms.push(+x.toFixed(1));
+ const line=(o,fn)=>({label:o,data:fn,borderColor:cols[o],backgroundColor:cols[o],pointRadius:0,borderWidth:2.5,tension:.2});
+ mk('c-X-mult',{type:'line',data:{labels:ms.map(x=>x+'x'),datasets:[line('A',ms.map(x=>modelA(S.A,{...G,mult:x}).npv)),line('B',ms.map(x=>modelB({...S.B,ai:false},{...G,mult:x}).npv)),line('C',ms.map(x=>modelC(S.C,{...G,mult:x}).npv))]},
+  options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:legend(t),tooltip:tip},scales:axes(t)}});
+ const ws=[];for(let x=7;x<=14.001;x+=.5)ws.push(+x.toFixed(1));
+ mk('c-X-wacc',{type:'line',data:{labels:ws.map(x=>x+'%'),datasets:[line('A',ws.map(x=>modelA(S.A,{...G,wacc:x/100}).npv)),line('B',ws.map(x=>modelB({...S.B,ai:false},{...G,wacc:x/100}).npv)),line('C',ws.map(x=>modelC(S.C,{...G,wacc:x/100}).npv))]},
+  options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:legend(t),tooltip:tip},scales:axes(t)}});
+ mk('c-X-radar',{type:'radar',data:{labels:['Risk','Difficulty','Fit'],datasets:['A','B','C'].map(o=>({label:o,data:RT[o],borderColor:cols[o],backgroundColor:alpha(cols[o],.12),pointBackgroundColor:cols[o],borderWidth:2}))},
+  options:{maintainAspectRatio:false,plugins:{legend:legend(t)},scales:{r:{min:0,max:5,ticks:{stepSize:1,color:t.muted,backdropColor:'transparent'},grid:{color:alpha('#888888',.3)},angleLines:{color:alpha('#888888',.3)},pointLabels:{color:t.fg,font:{size:12}}}}}});
+}
+function tabs(){const a={A:modelA(S.A).npv,B:modelB(S.B).npv,C:modelC(S.C).npv};['A','B','C'].forEach(o=>$('#tn-'+o).textContent=fmt(a[o]))}
+function globals(){$('#o_wacc').textContent=pct(G.wacc,2);$('#o_mult').textContent=G.mult.toFixed(1)+'x';$('#o_tax').textContent=pct(G.tax,0);const p=peakEV();$('#peakEV').textContent='$'+p.blend.toFixed(0)+'M';$('#peakEVsub').textContent='DCF $'+p.dcf.toFixed(0)+'M · multiples $548–572M'}
+function ratings(){$$('.ratings').forEach(el=>{const r=el.dataset.r.split(',').map(Number);el.innerHTML=['Risk','Difficulty','Fit'].map((l,i)=>`<div class="rt"><span>${l} · <b class="num" style="color:var(--ink)">${r[i]}/5</b></span><span class="pips">${[1,2,3,4,5].map(k=>`<i class="${k<=r[i]?'f':''}"></i>`).join('')}</span></div>`).join('')})}
+
+let active='A';
+function render(){globals();tabs();if(active==='A')renderA();if(active==='B')renderB();if(active==='C')renderC();if(active==='X')renderX()}
+
+/* ---------- bind controls ---------- */
+const binds={A:{a_n:['n',1],a_g:['g',.01],a_ret:['ret',.01],a_arpc:['arpc',1],a_m:['m',.01],a_i1:['i1',1],a_i2:['i2',1],a_p:['p',.01]},
+ B:{b_ap:['ap',1],b_g:['g',.01],b_price:['price',1],b_re:['re',.01],b_ph:['ph',.01],b_ic:['ic',1],b_p:['p',.01],b_debt:['debt',.01],b_cash:['cash',1]},
+ C:{c_prob:['prob',.01],c_ret:['ret',.01],c_pr:['pr',.01],c_cs:['cs',1],c_m:['m',.01],c_p:['p',.01]}};
+function syncOut(){Object.entries(binds).forEach(([o,b])=>Object.entries(b).forEach(([id,[k,sc]])=>{document.getElementById(id).value=S[o][k]/sc}));
+ $('#oa_n').textContent=S.A.n;$('#oa_g').textContent=pct(S.A.g);$('#oa_ret').textContent=pct(S.A.ret,0);$('#oa_arpc').textContent='$'+S.A.arpc.toLocaleString();$('#oa_m').textContent=pct(S.A.m,2);$('#oa_i1').textContent=`$${S.A.i1}M / $${S.A.i2}M`;$('#oa_p').textContent='+'+pct(S.A.p,2);
+ $('#ob_ap').textContent=fmt(S.B.ap);$('#ob_g').textContent=(S.B.g>=0?'+':'')+pct(S.B.g);$('#ob_price').textContent=fmt(S.B.price,0);$('#ob_re').textContent=pct(S.B.re,0);$('#ob_ph').textContent=pct(S.B.ph,0);$('#ob_ic').textContent=fmt(S.B.ic);$('#ob_p').textContent='+'+pct(S.B.p,2);$('#ob_debt').textContent=pct(S.B.debt,0)+' · $'+(S.B.debt*S.B.price).toFixed(0)+'M';$('#ob_cash').textContent='$'+S.B.cash+'M';
+ $('#oc_prob').textContent=pct(S.C.prob,0);$('#oc_ret').textContent=pct(S.C.ret,1);$('#oc_pr').textContent=pct(S.C.pr,2);$('#oc_cs').textContent=fmt(S.C.cs,2);$('#oc_m').textContent=pct(S.C.m,1);$('#oc_p').textContent='+'+pct(S.C.p,2);
+ $('#c_ok').checked=S.C.ok;$('#c_full').checked=S.C.full;$('#c_cum').checked=S.C.cum;
+ $$('#a_model button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.A.model));$('#a_retwrap').hidden=S.A.model!=='cohort';
+ $('#a_modelhint').textContent=S.A.model==='net'?"Expected: the 13% already accounts for the 10% of clients lost each year.":"Bolder view: new clients grow 13% a year, and 10% of existing clients leave. That gives about 1,860 clients by Year 3.";
+ $$('#c_roll button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.C.roll));
+}
+Object.entries(binds).forEach(([o,b])=>Object.entries(b).forEach(([id,[k,sc]])=>{document.getElementById(id).addEventListener('input',e=>{S[o][k]=parseFloat(e.target.value)*sc;clearPreset(o);syncOut();render()})}));
+['g_wacc','g_mult','g_tax'].forEach(id=>document.getElementById(id).addEventListener('input',e=>{const v=parseFloat(e.target.value);if(id==='g_wacc')G.wacc=v/100;if(id==='g_mult')G.mult=v;if(id==='g_tax')G.tax=v/100;render()}));
+$$('#a_model button').forEach(b=>b.addEventListener('click',()=>{S.A.model=b.dataset.v;clearPreset('A');syncOut();render()}));
+$$('#c_roll button').forEach(b=>b.addEventListener('click',()=>{S.C.roll=b.dataset.v;clearPreset('C');syncOut();render()}));
+[['c_ok','ok'],['c_full','full'],['c_cum','cum']].forEach(([id,k])=>document.getElementById(id).addEventListener('change',e=>{S.C[k]=e.target.checked;clearPreset('C');syncOut();render()}));
+function clearPreset(o){$$(`.presets[data-opt="${o}"] .chip`).forEach(c=>c.classList.remove('on'))}
+$$('.presets[data-opt]').forEach(p=>p.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{const o=p.dataset.opt,k=ch.dataset.s;const sc={...SC[o][k]};
+ Object.assign(S[o],JSON.parse(JSON.stringify(BASE[o])));delete sc.mult;Object.assign(S[o],sc);
+ if(o==='B'&&k==='ai'){S.B.debt=.8;S.B.cash=0}
+ const m=SC[o][k].mult;G.mult=m||11.5;$('#g_mult').value=G.mult;
+ p.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===ch));syncOut();render()})));
+$$('[data-reset]').forEach(b=>b.addEventListener('click',()=>{const o=b.dataset.reset;Object.assign(S[o],JSON.parse(JSON.stringify(BASE[o])));G.mult=11.5;$('#g_mult').value=11.5;$$(`.presets[data-opt="${o}"] .chip`).forEach(c=>c.classList.toggle('on',c.dataset.s==='base'));syncOut();render()}));
+['w_v','w_r','w_e','w_f'].forEach(id=>document.getElementById(id).addEventListener('input',()=>renderX()));
+$$('[data-w]').forEach(b=>b.addEventListener('click',()=>{const w=b.dataset.w.split(',');['w_v','w_r','w_e','w_f'].forEach((id,i)=>document.getElementById(id).value=w[i]);renderX()}));
+function show(o){active=o;['A','B','C','X'].forEach(k=>{$('#p-'+k).hidden=k!==o;$('#t-'+k).setAttribute('aria-selected',k===o)});try{localStorage.setItem('peak-tab',o)}catch(e){}render()}
+['A','B','C','X'].forEach(k=>$('#t-'+k).addEventListener('click',()=>show(k)));
+const themeRedraw=()=>render();try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeRedraw)}catch(e){}
+new MutationObserver(themeRedraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+ratings();syncOut();
+let start='B';const h=(location.hash||'').slice(1);if(['A','B','C','X'].includes(h))start=h;else{try{const v=localStorage.getItem('peak-tab');if(v)start=v}catch(e){}}
+show(start);
+})();
+</script>
+
+</body></html>
